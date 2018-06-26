@@ -47,6 +47,8 @@
         #console p {
             padding: 0;
             margin: 0;
+            font-size: 20px;
+            font-weight: bold;
         }
     </style>
     <script src="http://cdn.sockjs.org/sockjs-0.3.min.js"></script>
@@ -86,6 +88,8 @@
 
         Game.initialize = function() {
             this.entities = [];
+            this.food = [];
+            this.stats = [];
             canvas = document.getElementById('playground');
             if (!canvas.getContext) {
                 Console.log('Error: 2d canvas not supported by this browser.');
@@ -117,7 +121,7 @@
         Game.setDirection  = function(direction) {
             Game.direction = direction;
             Game.socket.send(direction);
-            Console.log('Sent: Direction ' + direction);
+            //Console.log('Sent: Direction ' + direction);
         };
 
         Game.startGameLoop = function() {
@@ -149,11 +153,17 @@
             for (var id in this.entities) {
                 this.entities[id].draw(this.context);
             }
+            for (var i = 0; i < this.food.length; ++i) {
+                this.context.fillStyle = '#00ff00';
+                this.context.fillRect(this.food[i].x, this.food[i].y, Game.gridSize, Game.gridSize);
+
+            }
         };
 
-        Game.addSnake = function(id, color) {
+        Game.addSnake = function(id, color, ip) {
             Game.entities[id] = new Snake();
             Game.entities[id].color = color;
+            Game.entities[id].ip = ip;
         };
 
         Game.updateSnake = function(id, snakeBody) {
@@ -187,8 +197,8 @@
 
             Game.socket.onopen = function () {
                 // Socket open.. start the game loop.
-                Console.log('Info: WebSocket connection opened.');
-                Console.log('Info: Press an arrow key to begin.');
+                //Console.log('Info: WebSocket connection opened.');
+                //Console.log('Info: Press an arrow key to begin.');
                 Game.startGameLoop();
                 setInterval(function() {
                     // Prevent server read timeout.
@@ -204,26 +214,47 @@
             Game.socket.onmessage = function (message) {
                 // _Potential_ security hole, consider using json lib to parse data in production.
                 var packet = eval('(' + message.data + ')');
+                //var packet = message.data;
                 switch (packet.type) {
                     case 'update':
+                        Console.clear();
+                        Console.log('Score:');
                         for (var i = 0; i < packet.data.length; i++) {
                             Game.updateSnake(packet.data[i].id, packet.data[i].body);
+                        }
+                        Game.food = packet.food;
+                        Game.stats = [];
+                        for (var p = 0; p < Game.entities.length; ++p) {
+                            if (Game.entities[p] != "Undefined") {
+                                Game.stats.push(Game.entities[p]);
+                            }
+                        }
+                        Game.stats.sort(function (a, b) {
+                            if (a.snakeBody.length < b.snakeBody.length) return 1;
+                            if (a.snakeBody.length == b.snakeBody.length) return 0;
+                            if (a.snakeBody.length > b.snakeBody.length) return -1;
+                        });
+                        for (var d = 0; d < Game.stats.length; ++d) {
+                            Console.log(Game.stats[d].snakeBody.length + '&nbsp;&nbsp;&nbsp;&nbsp;' + Game.stats[d].ip);
                         }
                         break;
                     case 'join':
                         for (var j = 0; j < packet.data.length; j++) {
-                            Game.addSnake(packet.data[j].id, packet.data[j].color);
+                            Game.addSnake(packet.data[j].id, packet.data[j].color, packet.data[j].ip);
                         }
                         break;
                     case 'leave':
                         Game.removeSnake(packet.id);
                         break;
                     case 'dead':
-                        Console.log('Info: Your snake is dead, bad luck!');
+                        //Console.log('Info: Your snake is dead, bad luck!');
                         Game.direction = 'none';
                         break;
                     case 'kill':
-                        Console.log('Info: Head shot!');
+                        //Console.log('Info: Head shot!');
+                        break;
+                    case 'feed':
+                        //Console.log('Info: Yummm!');
                         break;
                 }
             };
@@ -242,8 +273,13 @@
             }
             console.scrollTop = console.scrollHeight;
         });
+        Console.clear = function() {
+            var console = document.getElementById('console');
+            console.innerHTML = '';
+        };
 
-        Game.initialize();
+
+                Game.initialize();
     </script>
 </body>
 </html>

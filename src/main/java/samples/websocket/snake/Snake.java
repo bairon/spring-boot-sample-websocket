@@ -20,6 +20,7 @@ package samples.websocket.snake;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.List;
 
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -29,6 +30,7 @@ public class Snake {
 	private static final int DEFAULT_LENGTH = 5;
 
 	private final int id;
+	private final String ip;
 	private final WebSocketSession session;
 
 	private Direction direction;
@@ -37,9 +39,10 @@ public class Snake {
 	private final Deque<Location> tail = new ArrayDeque<Location>();
 	private final String hexColor;
 
-	public Snake(int id, WebSocketSession session) {
-		this.id = id;
+	public Snake(WebSocketSession session) {
+		this.id = SnakeUtils.IDS.getAndIncrement();
 		this.session = session;
+		this.ip = session.getAttributes().get("ip").toString();
 		this.hexColor = SnakeUtils.getRandomHexColor();
 		resetState();
 	}
@@ -56,16 +59,16 @@ public class Snake {
 		sendMessage("{'type': 'dead'}");
 	}
 
-	private synchronized void reward() throws Exception {
-		this.length++;
-		sendMessage("{'type': 'kill'}");
+	private synchronized void reward(int n) throws Exception {
+		this.length += n;
+		sendMessage("{'type': 'feed'}");
 	}
 
 	protected void sendMessage(String msg) throws Exception {
 		this.session.sendMessage(new TextMessage(msg));
 	}
 
-	public synchronized void update(Collection<Snake> snakes) throws Exception {
+	public synchronized void update(Collection<Snake> snakes, List<Apple> food) throws Exception {
 		Location nextLocation = this.head.getAdjacentLocation(this.direction);
 		if (nextLocation.x >= SnakeUtils.PLAYFIELD_WIDTH) {
 			nextLocation.x = 0;
@@ -88,6 +91,16 @@ public class Snake {
 		}
 
 		handleCollisions(snakes);
+		handleFeeding(food);
+	}
+
+	private void handleFeeding(List<Apple> food) throws Exception {
+		for (Apple apple : food) {
+			if (this.head.equals(apple.getPlace())) {
+				this.reward(1);
+				apple.reset();
+			}
+		}
 	}
 
 	private void handleCollisions(Collection<Snake> snakes) throws Exception {
@@ -98,7 +111,7 @@ public class Snake {
 			if (headCollision || tailCollision) {
 				kill();
 				if (this.id != snake.id) {
-					snake.reward();
+					snake.reward(2);
 				}
 			}
 		}
@@ -118,14 +131,14 @@ public class Snake {
 
 	public synchronized String getLocationsJson() {
 		StringBuilder sb = new StringBuilder();
-		sb.append(String.format("{x: %d, y: %d}", Integer.valueOf(this.head.x),
-				Integer.valueOf(this.head.y)));
+		sb.append(String.format("{x: %d, y: %d}", this.head.x,
+				this.head.y));
 		for (Location location : this.tail) {
 			sb.append(',');
-			sb.append(String.format("{x: %d, y: %d}", Integer.valueOf(location.x),
-					Integer.valueOf(location.y)));
+			sb.append(String.format("{x: %d, y: %d}", location.x,
+					location.y));
 		}
-		return String.format("{'id':%d,'body':[%s]}", Integer.valueOf(this.id),
+		return String.format("{'id':%d,'body':[%s]}", this.id,
 				sb.toString());
 	}
 
@@ -135,5 +148,9 @@ public class Snake {
 
 	public String getHexColor() {
 		return this.hexColor;
+	}
+
+	public String getIp() {
+		return ip;
 	}
 }

@@ -19,6 +19,7 @@ package samples.websocket.snake;
 
 import java.awt.Color;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class SnakeUtils {
 
@@ -27,6 +28,7 @@ public class SnakeUtils {
 	public static final int GRID_SIZE = 10;
 
 	private static final Random random = new Random();
+	public static final AtomicInteger IDS = new AtomicInteger(0);
 
 	public static String getRandomHexColor() {
 		float hue = random.nextFloat();
@@ -40,7 +42,9 @@ public class SnakeUtils {
 
 	public static Location getRandomLocation() {
 		int x = roundByGridSize(random.nextInt(PLAYFIELD_WIDTH));
+		x %= PLAYFIELD_WIDTH;
 		int y = roundByGridSize(random.nextInt(PLAYFIELD_HEIGHT));
+		y %= PLAYFIELD_HEIGHT;
 		return new Location(x, y);
 	}
 
@@ -51,4 +55,7 @@ public class SnakeUtils {
 		return value;
 	}
 
+	public static String getAppleColor() {
+		return "#00ff00";
+	}
 }

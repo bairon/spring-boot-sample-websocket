@@ -17,13 +17,10 @@
 
 package samples.websocket.snake;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -40,12 +37,13 @@ public class SnakeTimer {
 	private static final long TICK_DELAY = 100;
 
 	private static final ConcurrentHashMap<Integer, Snake> snakes = new ConcurrentHashMap<Integer, Snake>();
+	private static final List<Apple> food = new ArrayList<>();
 
 	public static synchronized void addSnake(Snake snake) {
 		if (snakes.size() == 0) {
 			startTimer();
 		}
-		snakes.put(Integer.valueOf(snake.getId()), snake);
+		snakes.put(snake.getId(), snake);
 	}
 
 	public static Collection<Snake> getSnakes() {
@@ -53,27 +51,36 @@ public class SnakeTimer {
 	}
 
 	public static synchronized void removeSnake(Snake snake) {
-		snakes.remove(Integer.valueOf(snake.getId()));
+		snakes.remove(snake.getId());
 		if (snakes.size() == 0) {
 			stopTimer();
 		}
 	}
 
-	public static void tick() throws Exception {
+	public static synchronized void tick() throws Exception {
 		StringBuilder sb = new StringBuilder();
 		for (Iterator<Snake> iterator = SnakeTimer.getSnakes().iterator(); iterator
 				.hasNext();) {
 			Snake snake = iterator.next();
-			snake.update(SnakeTimer.getSnakes());
+			snake.update(SnakeTimer.getSnakes(), SnakeTimer.food);
 			sb.append(snake.getLocationsJson());
 			if (iterator.hasNext()) {
 				sb.append(',');
 			}
 		}
-		broadcast(String.format("{'type': 'update', 'data' : [%s]}", sb.toString()));
+		StringBuilder ab = new StringBuilder();
+		for (Iterator<Apple> iterator = food.iterator(); iterator.hasNext();) {
+			Apple apple = iterator.next();
+			ab.append(apple.getLocationJson());
+			if (iterator.hasNext()) {
+				ab.append(',');
+			}
+		}
+		broadcast(String.format("{'type': 'update', 'data' : [%s], 'food' : [%s]}", sb.toString(), ab.toString()));
 	}
 
 	public static void broadcast(String message) throws Exception {
+//		System.out.println("Broadcasting: " + message);
 		Collection<Snake> snakes = new CopyOnWriteArrayList<>(SnakeTimer.getSnakes());
 		for (Snake snake : snakes) {
 			try {
@@ -105,5 +112,14 @@ public class SnakeTimer {
 		if (gameTimer != null) {
 			gameTimer.cancel();
 		}
+	}
+
+	public static synchronized void addApple() {
+		food.add(new Apple());
+	}
+
+	public static synchronized void removeApple() {
+		food.remove(food.size() - 1);
+
 	}
 }
